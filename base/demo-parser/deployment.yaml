@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: demo-parser
-          image: ghcr.io/5stackgg/demo-parser:latest
+          image: ghcr.io/deafcs/demo-parser:latest
           imagePullPolicy: Always
           ports:
             - name: http
