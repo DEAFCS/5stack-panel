@@ -96,3 +96,5 @@ spec:
                 name: s3-config
             - secretRef:
                 name: faceit-secrets
+            - secretRef:
+                name: push-secrets

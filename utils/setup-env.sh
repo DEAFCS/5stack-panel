@@ -304,6 +304,7 @@ if [ -n "$GAME_STREAM_DOMAIN" ] && [ -f overlays/mediamtx/mediamtx.env ]; then
 fi
 
 setup_steam_web_api_key "overlays/local-secrets/steam-secrets.env"
+setup_vapid_keys "overlays/local-secrets/push-secrets.env"
 
 if [ "$VAULT_MANAGER" = true ]; then
     if ! command -v vault &> /dev/null; then
@@ -327,6 +328,7 @@ if [ "$VAULT_MANAGER" = true ]; then
     migrate_secrets_to_vault "overlays/local-secrets/hasura-secrets.env" "kv/hasura"
     migrate_secrets_to_vault "overlays/local-secrets/faceit-secrets.env" "kv/faceit"
     migrate_secrets_to_vault "overlays/local-secrets/discord-secrets.env" "kv/discord"
+    migrate_secrets_to_vault "overlays/local-secrets/push-secrets.env" "kv/push"
 fi
 
 step "Domains and Hosts Configuration"
