@@ -152,6 +152,13 @@ spec:
                   number: 5585
             path: /notifications
             pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /support-requests
+            pathType: Prefix
     - host: $(WEB_DOMAIN)
       http:
         paths:
