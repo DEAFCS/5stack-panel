@@ -245,6 +245,34 @@ spec:
                   number: 5585
             path: /verification-applications
             pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /admin-calls
+            pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /matchmaking
+            pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /twitch
+            pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /file-manager
+            pathType: Prefix
 
 ---
 apiVersion: networking.k8s.io/v1
