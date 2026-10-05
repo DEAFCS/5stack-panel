@@ -231,6 +231,20 @@ spec:
                   number: 5585
             path: /quick-connect
             pathType: Exact
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /chat
+            pathType: Prefix
+          - backend:
+              service:
+                name: api
+                port:
+                  number: 5585
+            path: /verification-applications
+            pathType: Prefix
 
 ---
 apiVersion: networking.k8s.io/v1
