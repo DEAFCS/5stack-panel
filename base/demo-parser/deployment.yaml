@@ -15,6 +15,10 @@ spec:
       labels:
         app: demo-parser
     spec:
+      # Keep demo parsing off the CS2 node: parsing a demo burns a full core and
+      # competes with the match servers there. Runs on the web node instead.
+      nodeSelector:
+        kubernetes.io/hostname: v2202608399636501351
       containers:
         - name: demo-parser
           image: ghcr.io/deafcs/demo-parser:latest
