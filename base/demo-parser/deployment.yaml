@@ -21,7 +21,7 @@ spec:
         kubernetes.io/hostname: v2202608399636501351
       containers:
         - name: demo-parser
-          image: ghcr.io/deafcs/demo-parser:latest
+          image: ghcr.io/deafcs/demo-parser@sha256:b98549e50239dcfce37e8e3ed5505d993c1b70d794db4078c62f2ef1d252abdc
           imagePullPolicy: Always
           ports:
             - name: http

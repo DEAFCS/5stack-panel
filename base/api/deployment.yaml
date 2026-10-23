@@ -35,7 +35,9 @@ spec:
                 values:
                   - "true"
       containers:
-        - image: ghcr.io/deafcs/api:latest
+        # Pinned to what runs in production. :latest would let update.sh pull a
+        # release nobody has tested. Bump the digest when the API is deployed.
+        - image: ghcr.io/deafcs/api@sha256:bbb83f98613342c80aa42d3787cfdb4e74d7b7de201ced0eed136bf1c7e408a9
           name: api
           resources:
             requests:
@@ -71,6 +73,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # The game server images the API starts, pinned the same way.
+            - name: SERVER_IMAGE
+              value: ghcr.io/deafcs/game-server-sw@sha256:b3734e703e1e8d17d0cde214b43aa67fa94475bcb84afd6edfe01dbc6df70f91
+            - name: PRACTICE_SERVER_IMAGE
+              value: ghcr.io/deafcs/game-server-sw@sha256:ae127e0bf7230d856f91303e539917d007baffc0aa978a88f47beba668c285a4
           envFrom:
             - configMapRef:
                 name: api-config
@@ -98,3 +105,15 @@ spec:
                 name: faceit-secrets
             - secretRef:
                 name: push-secrets
+            # Created by hand in the cluster (kubectl create secret generic),
+            # not by the local-secrets overlay: a generated secret would be
+            # rewritten from an empty .env file on the next update.sh run.
+            - secretRef:
+                name: giphy-secrets
+                optional: true
+            - secretRef:
+                name: twitch-secrets
+                optional: true
+            - secretRef:
+                name: steam-gc-secrets
+                optional: true

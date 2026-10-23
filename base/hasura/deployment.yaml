@@ -99,7 +99,7 @@ spec:
               name: workdir
       initContainers:
         - name: migrations
-          image: ghcr.io/deafcs/api:latest
+          image: ghcr.io/deafcs/api@sha256:bbb83f98613342c80aa42d3787cfdb4e74d7b7de201ced0eed136bf1c7e408a9
           command:
             - /bin/sh
             - -c

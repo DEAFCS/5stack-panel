@@ -34,7 +34,7 @@ spec:
                     values:
                       - 'true'
       containers:
-        - image: ghcr.io/deafcs/web:latest
+        - image: ghcr.io/deafcs/web@sha256:18d59f631afc673b09dd9586910d1914bad1b743514cea3ddd8e57e150f79f90
           name: web
           resources:
             requests:
