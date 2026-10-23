@@ -19,3 +19,7 @@ spec:
                   number: 9001
             path: /(.*)
             pathType: ImplementationSpecific
+  tls:
+    - hosts:
+        - ${S3_CONSOLE_HOST}
+      secretName: 5stack-ssl

@@ -82,6 +82,11 @@ replacements:
           name: s3-console
         fieldPaths:
           - spec.rules.0.host
+      - select:
+          kind: Ingress
+          name: s3-console
+        fieldPaths:
+          - spec.tls.0.hosts.0
   - source:
       kind: ConfigMap
       name: typesense-config
