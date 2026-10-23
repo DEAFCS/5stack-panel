@@ -1,0 +1,191 @@
+# DEAFCS: weekly backup of the RustFS data directory (everything in the object
+# store: demos, clips, avatars, ...) to the big disk on the GPU node.
+#
+# Not part of the panel's kustomization on purpose: it names two nodes and a
+# disk that only exist here. Apply by hand:
+#   kubectl apply -f deafcs/rustfs-weekly-backup.yaml
+#
+# How it works
+#   - rustfs-backup-src runs on the node that holds /opt/5stack/minio and serves
+#     it READ-ONLY over rsync, inside the cluster only.
+#   - rustfs-weekly-backup runs on the GPU node every Sunday 06:00 (Oslo time) and
+#     pulls it into /mnt/storage12tb/backups/rustfs/<date>/ with rsync
+#     --link-dest against the previous snapshot: every dated folder looks like a
+#     complete copy, but a file that did not change since the last snapshot is a
+#     hard link, so it is neither copied again nor stored twice.
+#   - It keeps the newest 8 snapshots. Deleting an old one never breaks a newer
+#     one. A file deleted from RustFS stays in the older snapshots until they go.
+#   - The Postgres dumps are in the same bucket (5stack-db-backups), so they are
+#     part of it. They run 05:30 daily, before this starts.
+#
+# Restore: stop rustfs, copy a snapshot folder over /opt/5stack/minio (or point
+# the volume at it), start rustfs. Whole folder = whole object store, including
+# RustFS' own metadata (buckets, users).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rustfs-weekly-backup-script
+  namespace: 5stack
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -u
+    DEST=/backup/rustfs
+    KEEP="${KEEP_SNAPSHOTS:-8}"
+    NAME="${SNAPSHOT_NAME:-$(date +%F)}"
+    MIN_FREE_GB=100
+
+    apk add --no-cache rsync >/dev/null 2>&1 || { echo "ERROR: could not install rsync"; exit 1; }
+    mkdir -p "$DEST"
+
+    # BusyBox: df -Pk (KB), no --block-size.
+    FREE_GB=$(df -Pk "$DEST" | awk 'NR==2 {print int($4/1048576)}')
+    if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+      echo "ERROR: only ${FREE_GB} GB free on the backup disk, need ${MIN_FREE_GB}"
+      exit 1
+    fi
+
+    if [ -d "$DEST/$NAME" ]; then
+      echo "Snapshot $NAME already exists, nothing to do."
+      exit 0
+    fi
+
+    # The newest finished snapshot (a dated folder, never a .partial).
+    PREV=$(ls -1d "$DEST"/20??-??-?? 2>/dev/null | tail -1)
+    LINK=""
+    [ -n "$PREV" ] && LINK="--link-dest=$PREV"
+    echo "Snapshot: $NAME   previous: ${PREV:-none}"
+
+    # Into .partial first, so an interrupted run is never mistaken for a snapshot
+    # and the next run can pick up where it stopped.
+    # --no-perms: the first snapshot was written as rw-r--r-- while the source is
+    # rw-rw-r-- (and setgid on directories), and any difference makes rsync copy
+    # the file again instead of hard-linking it. RustFS runs as root, so the
+    # mode bits do not matter; owner, group and times are still compared.
+    rsync -a --no-perms --numeric-ids --info=stats2 $LINK rsync://rustfs-backup-src/minio/ "$DEST/$NAME.partial/"
+    RC=$?
+    # 24: a file vanished while copying (an upload or delete during the run). Fine.
+    if [ "$RC" -ne 0 ] && [ "$RC" -ne 24 ]; then
+      echo "ERROR: rsync failed with exit code $RC; leaving $NAME.partial for the next run"
+      exit "$RC"
+    fi
+
+    mv "$DEST/$NAME.partial" "$DEST/$NAME" && ln -sfn "$NAME" "$DEST/latest"
+    echo "Snapshot $NAME complete at $(date -u +%FT%TZ)"
+
+    # Keep the newest $KEEP dated snapshots.
+    ls -1d "$DEST"/20??-??-?? | head -n "-$KEEP" | while read -r OLD; do
+      echo "Pruning $OLD"
+      rm -rf "$OLD"
+    done
+    echo "BACKUP-DONE"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs-backup-src
+  namespace: 5stack
+  labels:
+    app: rustfs-backup-src
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rustfs-backup-src
+  template:
+    metadata:
+      labels:
+        app: rustfs-backup-src
+    spec:
+      # The node that holds the RustFS volume (hostPath /opt/5stack/minio).
+      nodeSelector:
+        kubernetes.io/hostname: v2202608399636501351
+      containers:
+        - name: rsyncd
+          image: alpine:3.20
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              apk add --no-cache rsync >/dev/null &&
+              printf '[minio]\n  path = /data\n  read only = yes\n  uid = 0\n  gid = 0\n  use chroot = no\n  hosts allow = 10.42.0.0/16\n' > /etc/rsyncd.conf &&
+              exec rsync --daemon --no-detach --config=/etc/rsyncd.conf --port=873
+          ports:
+            - containerPort: 873
+          readinessProbe:
+            tcpSocket:
+              port: 873
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: data
+          hostPath:
+            path: /opt/5stack/minio
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs-backup-src
+  namespace: 5stack
+spec:
+  selector:
+    app: rustfs-backup-src
+  ports:
+    - port: 873
+      targetPort: 873
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rustfs-weekly-backup
+  namespace: 5stack
+spec:
+  # Sunday 06:00 Oslo time. The Postgres dump (05:30) is in the bucket by then.
+  schedule: "0 6 * * 0"
+  timeZone: "Europe/Oslo"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          # The GPU node, where the 11 TB disk is mounted.
+          nodeSelector:
+            kubernetes.io/hostname: f5aae8b2-7238-4398-bb39-62467ba00022
+          containers:
+            - name: backup
+              image: alpine:3.20
+              command: ["/bin/sh", "/scripts/backup.sh"]
+              env:
+                - name: KEEP_SNAPSHOTS
+                  value: "8"
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: script
+              configMap:
+                name: rustfs-weekly-backup-script
+            - name: backup
+              hostPath:
+                path: /mnt/storage12tb
+                type: Directory

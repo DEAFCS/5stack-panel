@@ -4,7 +4,9 @@ metadata:
   name: postgres-backup
   namespace: 5stack
 spec:
-  schedule: "0 3 * * *"
+  # DEAFCS: 05:30 (server time, Europe/Berlin = Oslo), so the dump is finished
+  # and in the bucket before the Sunday 06:00 file backup starts.
+  schedule: "30 5 * * *"
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   jobTemplate:
