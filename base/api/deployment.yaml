@@ -77,7 +77,7 @@ spec:
             - name: SERVER_IMAGE
               value: ghcr.io/deafcs/game-server-sw@sha256:e1a6a5bf475dc4242957921e6a26deba4918cda6c5754b60b1d2ddc1904d60a9
             - name: PRACTICE_SERVER_IMAGE
-              value: ghcr.io/deafcs/game-server-sw@sha256:ae127e0bf7230d856f91303e539917d007baffc0aa978a88f47beba668c285a4
+              value: ghcr.io/deafcs/game-server-sw@sha256:e1a6a5bf475dc4242957921e6a26deba4918cda6c5754b60b1d2ddc1904d60a9
           envFrom:
             - configMapRef:
                 name: api-config
